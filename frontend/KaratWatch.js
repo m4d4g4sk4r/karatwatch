@@ -2,7 +2,7 @@
 // These must be at the very top of the file. Do not edit.
 // icon-color: gray; icon-glyph: magic;
 // KARATWATCH — SCRIPTABLE
-// Ahmedabad, India
+// Configurable Indian city; Ahmedabad by default
 //
 // Widget parameters:
 // today        gold 24k + 22k + silver
@@ -46,23 +46,118 @@ const KEYS = {
 
 const fm = FileManager.local();
 
-const cacheFile = fm.joinPath(
-  fm.documentsDirectory(),
-  "precious-metals-cache-v2.json"
-);
+// Use the Goodreturns city name or URL slug, e.g. Mumbai or Bangalore.
+function resolveCity(value) {
+  const input = String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
+  const aliases = { bengaluru: "bangalore", gurugram: "gurgaon" };
+  const slug = aliases[input] || input;
+  if (!/^[a-z]+(?:-[a-z]+)*$/.test(slug) || slug.length > 60) {
+    throw Error("Enter a city name or Goodreturns city slug, not a URL.");
+  }
+  return { slug, name: slug.split("-").map(x => x[0].toUpperCase() + x.slice(1)).join(" ") };
+}
 
-const retryFile = fm.joinPath(
-  fm.documentsDirectory(),
-  "precious-metals-retry-v2.json"
-);
+function cityStoragePath(kind, version, slug) {
+  // Keep existing Ahmedabad files compatible with installed widgets.
+  const suffix = slug === "ahmedabad" ? "" : "-" + slug;
+  return fm.joinPath(fm.documentsDirectory(), `precious-metals-${kind}-v${version}${suffix}.json`);
+}
 
-// Price alert thresholds, edited in-app.
-// { gold24k: { above, below }, ... }
+const locationFile = fm.joinPath(fm.documentsDirectory(), "karatwatch-location-v1.json");
+let location, cacheFile, retryFile, alertsFile;
+function applyCity(value) {
+  location = resolveCity(value);
+  SETTINGS.city = location.name;
+  cacheFile = cityStoragePath("cache", 2, location.slug);
+  retryFile = cityStoragePath("retry", 2, location.slug);
+  alertsFile = cityStoragePath("alerts", 1, location.slug);
+}
+applyCity(SETTINGS.city);
+try {
+  const savedLocation = readFile(locationFile);
+  if (savedLocation) applyCity(savedLocation.slug);
+} catch (_) { /* A corrupt preference must not prevent widget startup. */ }
 
-const alertsFile = fm.joinPath(
-  fm.documentsDirectory(),
-  "precious-metals-alerts-v1.json"
-);
+function sourceURL(metal) {
+  if (!["gold", "silver"].includes(metal)) throw Error("Invalid metal");
+  return `https://www.goodreturns.in/${metal}-rates/${location.slug}.html`;
+}
+
+// Only links from the Indian cities table are passed here, never country rates.
+function parseCityLinks(links) {
+  const cities = new Map();
+  for (const link of links) {
+    const match = String(link.href).match(/^(?:https:\/\/www\.goodreturns\.in)?\/gold-rates\/([a-z]+(?:-[a-z]+)*)\.html$/);
+    if (!match) continue;
+    const city = resolveCity(match[1]);
+    cities.set(city.slug, city);
+  }
+  return Array.from(cities.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function availableCities() {
+  const path = fm.joinPath(fm.documentsDirectory(), "karatwatch-cities-v1.json");
+  try {
+    const req = new Request("https://www.goodreturns.in/gold-rates/");
+    req.timeoutInterval = SETTINGS.webTimeoutSeconds;
+    const html = await req.loadString();
+    if (Number((req.response || {}).statusCode) !== 200) throw Error("Directory unavailable");
+    const view = new WebView();
+    await view.loadHTML("<html><body></body></html>");
+    const links = await view.evaluateJavaScript(`(() => {
+      const doc = new DOMParser().parseFromString(${JSON.stringify(html)}, "text/html");
+      let indianCities = false;
+      const links = [];
+      for (const node of doc.querySelectorAll("h2, h3, table")) {
+        if (/^H[23]$/.test(node.tagName)) {
+          indianCities = /Indian Major Cities Gold Rates/i.test(node.textContent);
+        } else if (indianCities) {
+          for (const a of node.querySelectorAll("a[href]")) {
+            links.push({ href: a.getAttribute("href") });
+          }
+        }
+      }
+      return links;
+    })()`);
+    const cities = parseCityLinks(links);
+    if (!cities.length) throw Error("City directory format changed");
+    saveFile(path, links);
+    return { cities, cached: false };
+  } catch (_) {
+    const saved = readFile(path);
+    return { cities: Array.isArray(saved) ? parseCityLinks(saved) : [], cached: true };
+  }
+}
+
+async function changeCity() {
+  const directory = await availableCities();
+  const options = directory.cities.map(city => city.name);
+  options.push("Enter another city manually");
+  const selected = await choose(directory.cached ? "Choose city (offline list)" : "Choose city", options);
+  if (selected < 0) return;
+  let value;
+  if (selected < directory.cities.length) {
+    value = directory.cities[selected].slug;
+  } else {
+    const a = new Alert();
+    a.title = "Indian city";
+    a.message = "Enter the city slug from its Goodreturns URL, e.g. Mumbai or Bangalore. Both gold and silver pages must exist. API mode requires the server to return the same city.";
+    a.addTextField("City", location.slug);
+    a.addAction("Save");
+    a.addCancelAction("Cancel");
+    if (await a.presentAlert() !== 0) return;
+    value = a.textFieldValue(0);
+  }
+  try {
+    const next = resolveCity(value);
+    fm.writeString(locationFile, JSON.stringify({ slug: next.slug }));
+    applyCity(next.slug);
+  } catch (e) {
+    await showAlert("City not saved", String(e.message || e));
+    return;
+  }
+  await refreshNow();
+}
 
 const ALERT_METALS = [
   {
@@ -740,7 +835,7 @@ function parseSourceTables(tables, metal) {
 
 async function requestDirectPrices() {
   async function fetchMetal(metal) {
-    const req = new Request(`https://www.goodreturns.in/${metal}-rates/ahmedabad.html`);
+    const req = new Request(sourceURL(metal));
     req.timeoutInterval = SETTINGS.webTimeoutSeconds;
     const html = await req.loadString();
     if (Number((req.response || {}).statusCode) !== 200) {
@@ -2233,7 +2328,8 @@ async function runApp() {
         "Preview widget",
         "Price alerts",
         "Set / replace credentials",
-        "Remove credentials"
+        "Remove credentials",
+        "Change city (" + SETTINGS.city + ")"
       ]
     );
 
@@ -2253,6 +2349,10 @@ async function runApp() {
 
     if (n === 3) {
       await setup();
+    }
+
+    if (n === 5) {
+      await changeCity();
     }
 
     if (n === 4) {

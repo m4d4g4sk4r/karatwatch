@@ -2,7 +2,7 @@
 
 ## Product and code
 
-KaratWatch is a Scriptable iOS widget for Ahmedabad gold and silver prices.
+KaratWatch is a Scriptable iOS widget for configurable Indian-city gold and silver prices.
 Direct Goodreturns fetching is the default. The FastAPI backend is optional.
 
 - `frontend/KaratWatch.js`: public standalone widget, no personal endpoint.
