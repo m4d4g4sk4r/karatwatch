@@ -3,7 +3,7 @@
 # KaratWatch
 ### Gold & silver. A glance away.
 
-A Scriptable widget for your iPhone Home Screen — current prices, history, and alerts for Ahmedabad.
+A Scriptable widget for your iPhone Home Screen — current prices, history, and alerts for your city.
 
 [![CI](https://github.com/m4d4g4sk4r/karatwatch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/m4d4g4sk4r/karatwatch/actions/workflows/ci.yml)
 
@@ -41,6 +41,20 @@ Gold is shown in INR per **10 grams**, silver per **kilogram**. Prices are indic
 
 No backend setup is needed. `SETTINGS.serverURL` is empty by default.
 
+**Choose your city:** run the script and select **Change city**. Ahmedabad is the
+initial default. The picker loads the Indian cities table from the
+[Goodreturns gold directory](https://www.goodreturns.in/gold-rates/), with a saved
+list available offline. You can also enter a city slug manually, such as `mumbai`,
+`chennai`, or `bangalore` (`Bengaluru` also works). The city must have both gold and
+silver pages with the supported table format; unavailable pages show a fetch error.
+The saved choice applies to all widgets using this installation. Prices, retry
+state, and alert thresholds are stored separately for each city. Existing Ahmedabad
+cache and alert files are preserved. Widget parameters such as `gold:7` are unchanged.
+
+In optional API mode, the response’s `city` must match the selected city. The widget sends the selected slug as a `city` query parameter,
+for example `/api/metals?city=mumbai`. The included backend isolates prices and
+provider state by city. A mismatched response is rejected.
+
 | Parameter | What you see |
 | --- | --- |
 | `today` | Gold 24K, gold 22K, and silver |
@@ -57,7 +71,7 @@ script executes, not as an always-on background monitor.
 
 ## Two ways to get prices
 
-**Direct — default.** Your phone requests the Ahmedabad gold and silver pages,
+**Direct — default.** Your phone requests your selected city’s gold and silver pages,
 parses their price tables, validates the result, and saves a local cache. No account
 or credentials. Site blocking, unavailable pages, or layout changes can interrupt
 updates; the widget shows cached data where available. It does not bypass challenges.

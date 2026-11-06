@@ -1,4 +1,6 @@
 import os
+import re
+from pathlib import Path
 import logging
 import asyncio
 import time
@@ -54,7 +56,7 @@ settings = Settings()
 
 app = FastAPI(
     title="Precious Metals API",
-    description="Gold and Silver prices for Ahmedabad, India - Multi-provider architecture",
+    description="Gold and Silver prices for Indian cities - Multi-provider architecture",
     version="1.0.0"
 )
 
@@ -69,6 +71,43 @@ app.add_middleware(
 provider_manager: Optional[ProviderManager] = None
 cache_manager: Optional[CacheManager] = None
 rate_limiter: Optional["RateLimiter"] = None
+
+city_contexts = {}
+
+
+def normalize_city(value: str) -> str:
+    slug = re.sub(r"\s+", "-", value.strip().lower())
+    slug = {"bengaluru": "bangalore", "gurugram": "gurgaon"}.get(slug, slug)
+    if len(slug) > 60 or not re.fullmatch(r"[a-z]+(?:-[a-z]+)*", slug):
+        raise HTTPException(status_code=422, detail="Invalid city slug")
+    return slug
+
+
+def city_context(slug: str):
+    if slug == "ahmedabad":
+        return provider_manager, cache_manager
+    if slug not in city_contexts:
+        # Bound provider sessions and in-memory state; do not evict active requests.
+        if len(city_contexts) >= 128:
+            raise HTTPException(status_code=503, detail="City capacity reached")
+        configs = {
+            "goodreturns": ProviderConfig(
+                name="goodreturns", timeout=settings.METALS_PROVIDER_TIMEOUT,
+                retry_cooldown=settings.METALS_PROVIDER_RETRY_COOLDOWN,
+                max_failures=settings.METALS_PROVIDER_MAX_FAILURES,
+                custom_config={
+                    "gold_url": f"https://www.goodreturns.in/gold-rates/{slug}.html",
+                    "silver_url": f"https://www.goodreturns.in/silver-rates/{slug}.html",
+                },
+            )
+        }
+        names = [name.strip() for name in settings.METALS_PROVIDERS.split(",") if name.strip()]
+        manager = ProviderManager(names, configs)
+        base = Path(settings.CACHE_FILE)
+        cache = CacheManager(str(base.with_name(f"{base.stem}-{slug}{base.suffix}")),
+                             settings.CACHE_TTL_SECONDS, settings.RETRY_COOLDOWN_SECONDS)
+        city_contexts[slug] = (manager, cache)
+    return city_contexts[slug]
 
 
 class RateLimiter:
@@ -114,6 +153,7 @@ class RateLimiter:
 async def lifespan(app: FastAPI):
     global provider_manager, cache_manager, rate_limiter
 
+    city_contexts.clear()
     provider_configs = {
         "goodreturns": ProviderConfig(
             name="goodreturns",
@@ -147,6 +187,9 @@ async def lifespan(app: FastAPI):
 
     if provider_manager:
         await provider_manager.close()
+    for manager, _ in city_contexts.values():
+        await manager.close()
+    city_contexts.clear()
 
 
 app.router.lifespan_context = lifespan
@@ -192,6 +235,7 @@ def get_client_ip(request: Request) -> str:
 @app.get("/api/metals")
 async def get_metals(
     request: Request,
+    city: str = "ahmedabad",
     auth: bool = Depends(verify_auth)
 ):
     client_ip = get_client_ip(request)
@@ -203,7 +247,18 @@ async def get_metals(
             headers={"Retry-After": str(retry_after)}
         )
 
+    slug = normalize_city(city)
+    manager, cache = city_context(slug)
+    async with cache.lock:
+        return await prices_for_city(slug, manager, cache)
+
+
+async def prices_for_city(slug, provider_manager, cache_manager):
     cached = cache_manager.get()
+    city_name = slug.replace("-", " ").title()
+    if cached and cached.city != city_name:
+        # Never relabel persisted prices from a different city.
+        cached = None
     if cached and cache_manager.is_valid():
         logger.info("Serving fresh cached data")
         cached.stale = False
@@ -225,7 +280,7 @@ async def get_metals(
     provider_result = await provider_manager.fetch_with_failover(required_caps)
 
     fallback_used = False
-    cached_response = cache_manager.get()
+    cached_response = cached
 
     if provider_result.success:
         errors = DataValidator.validate_provider_result(provider_result, required_caps)
@@ -239,7 +294,7 @@ async def get_metals(
             cache_manager.record_attempt(provider.name)
 
     if provider_result.success:
-        response = DataNormalizer.build_response(provider_result, cached=False, fallback_used=fallback_used)
+        response = DataNormalizer.build_response(provider_result, cached=False, fallback_used=fallback_used, city=city_name)
         cache_manager.set(response, success=True, provider=provider_result.provider)
         return JSONResponse(content=response.to_dict())
     elif cached_response:
