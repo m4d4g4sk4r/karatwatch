@@ -135,3 +135,6 @@ Widget parameter examples:
 
 ## Public distribution and CI
 Publish `frontend/KaratWatch.js` with a placeholder hostname. Keep the personal widget ignored. See CONTRIBUTING.md for PR checks. Never deploy from CI or expose secrets to pull requests. Root README supersedes historical deployment notes.
+
+## Widget-first product
+KaratWatch is the Scriptable widget. Direct Goodreturns fetching is the default; the backend is optional. Public source is frontend/KaratWatch.js. Run node --test frontend/tests/*.test.cjs. Default GitHub branch is main.

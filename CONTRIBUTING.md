@@ -1,9 +1,10 @@
 # Contributing to KaratWatch
 
-Create a feature branch and open a pull request against the default branch.
+Create a feature branch and open a pull request against the `main` branch.
 Keep credentials in ignored `.env` files or Scriptable Keychain. Edit the public
 `frontend/KaratWatch.js`, not the ignored personal widget.
 
+Run `node --test frontend/tests/*.test.cjs` for widget behavior checks.
 Run `python -m compileall -q backend`, then from `backend` run
 `python -m pytest tests -v`. Check the widget with
 `node --input-type=module --check < frontend/KaratWatch.js`.

@@ -24,8 +24,8 @@
 
 const SETTINGS = {
   city: "Ahmedabad",
-  serverURL:
-    "https://metals.example.com/api/metals",
+  serverURL: "", // Optional: your authenticated /api/metals endpoint
+  webTimeoutSeconds: 12,
   serverTimeoutSeconds: 6,
   // Prices are fetched once a day at this
   // local time. Tapping the widget or using
@@ -714,6 +714,55 @@ function retryMilliseconds(value) {
     : 15 * 60000;
 }
 
+// Convert table cell text into the same units as the optional API.
+function parseSourceTables(tables, metal) {
+  const amount = text => {
+    const match = String(text).replace(/,/g, "").match(/\d+(?:\.\d+)?/);
+    if (!match || !price(Number(match[0]))) throw Error("Invalid source price");
+    return Number(match[0]);
+  };
+  const current = tables[0] && tables[0].find(row => row[0] === "1");
+  if (!current || !tables[1]) throw Error("Price tables unavailable");
+  const history = tables[1].filter(row => /^[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}$/.test(row[0])).map(row => {
+    const match = row[0].match(/^(\w+)\s+(\d+),\s+(\d+)$/);
+    const month = months.indexOf(match[1]) + 1;
+    const date = `${match[3]}-${String(month).padStart(2, "0")}-${match[2].padStart(2, "0")}`;
+    if (!isFinite(dayTime(date))) throw Error("Invalid source date");
+    return metal === "gold"
+      ? { date, "24k": amount(row[1]) * 10, "22k": amount(row[2]) * 10 }
+      : { date, price: amount(row[3]) };
+  });
+  if (!history.length) throw Error("Price history unavailable");
+  return metal === "gold"
+    ? { "24k": amount(current[1]) * 10, "22k": amount(current[2]) * 10, history }
+    : { price: amount(current[1]) * 1000, history };
+}
+
+async function requestDirectPrices() {
+  async function fetchMetal(metal) {
+    const req = new Request(`https://www.goodreturns.in/${metal}-rates/ahmedabad.html`);
+    req.timeoutInterval = SETTINGS.webTimeoutSeconds;
+    const html = await req.loadString();
+    if (Number((req.response || {}).statusCode) !== 200) {
+      throw { label: "Goodreturns unavailable or blocked", wait: 15 * 60000 };
+    }
+    // Parse inert HTML locally. Do not execute remote scripts or load page assets.
+    const view = new WebView();
+    await view.loadHTML("<html><body></body></html>");
+    const tables = await view.evaluateJavaScript(`(() => {
+      const doc = new DOMParser().parseFromString(${JSON.stringify(html)}, "text/html");
+      return Array.from(doc.querySelectorAll("table.gr-table.table-conatiner"))
+        .map(table => Array.from(table.querySelectorAll("tbody.tablebody tr"))
+          .map(row => Array.from(row.querySelectorAll("td"))
+            .map(cell => cell.textContent.trim())));
+    })()`);
+    return parseSourceTables(tables, metal);
+  }
+  const [gold, silver] = await Promise.all([fetchMetal("gold"), fetchMetal("silver")]);
+  return validate({ city: SETTINGS.city, updatedAt: new Date().toISOString(),
+    stale: false, gold, silver, source: { provider: "goodreturns" } });
+}
+
 async function requestPrices(auth) {
   const req = new Request(
     SETTINGS.serverURL
@@ -842,7 +891,7 @@ async function loadPrices(force) {
     reason
   });
 
-  if (!auth) {
+  if (SETTINGS.serverURL && !auth) {
     return fallback(
       "Setup required",
       true
@@ -878,7 +927,9 @@ async function loadPrices(force) {
   }
 
   try {
-    const data = await requestPrices(auth);
+    const data = SETTINGS.serverURL
+      ? await requestPrices(auth)
+      : await requestDirectPrices();
 
     const retrievedAt =
       new Date().toISOString();
@@ -2155,12 +2206,12 @@ async function runApp() {
 
   if (
     query.action === "refresh" &&
-    credentials()
+    (!SETTINGS.serverURL || credentials())
   ) {
     await refreshNow();
   }
 
-  if (!credentials()) {
+  if (SETTINGS.serverURL && !credentials()) {
     const n = await choose(
       "Welcome!",
       [
@@ -2176,7 +2227,7 @@ async function runApp() {
 
   while (true) {
     const n = await choose(
-      "Precious Metals",
+      "KaratWatch",
       [
         "Refresh prices now",
         "Preview widget",
