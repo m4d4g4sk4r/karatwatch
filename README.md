@@ -106,11 +106,18 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Status and privacy
 
-Direct mode has automated parser tests; on-device Scriptable execution still needs
-verification. The source is currently Ahmedabad-specific. Avoid changing only the
-city label: the source URLs and validation must agree.
+City selection is supported in direct and optional API modes. Automated tests cover
+parsing, city isolation, and API behavior; visual layouts still need on-device review.
 
 Credentials belong in Keychain or ignored `.env` files. Historical credentials were
 rotated and repository history cleaned. Re-clone old checkouts rather than merging old history. Cached GitHub views or downloaded copies can retain revoked values.
-The ignored personal widget is never published. No redistribution license has been
-selected yet.
+The ignored personal widget is never published.
+
+## License
+
+KaratWatch is available under the [MIT License](LICENSE), including its warranty
+and liability disclaimers. Keep the copyright and license notice when redistributing
+copies or substantial portions of the software.
+
+Prices are third-party, indicative data; this software license does not grant rights
+to Goodreturns content or change its terms. See the license for the full terms.
