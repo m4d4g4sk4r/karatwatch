@@ -13,22 +13,11 @@ A Scriptable widget for your iPhone Home Screen — current prices, history, and
 
 ![KaratWatch — Gold & silver. A glance away.](assets/karatwatch-title.png)
 
-## At home on your Home Screen
+## KaratWatch on iPhone
 
 ![Small, medium, and large KaratWatch widgets in staged iPhone Home Screen mockups](assets/karatwatch-widget-sizes.png)
 
-*AI-assisted mockups based on actual widget captures; layouts are illustrative and prices historical.*
-
-<details>
-<summary>View the original iPhone screenshots</summary>
-
-<p align="center">
-  <img src="assets/today-original.png" width="220" alt="Original small widget with current gold and silver prices">
-  <img src="assets/gold-history-original.png" width="220" alt="Original medium widget comparing 24K and 22K gold history">
-  <img src="assets/silver-original.png" width="220" alt="Original small silver widget with price and sparkline">
-</p>
-
-</details>
+*Illustrative iPhone Home Screen previews; prices shown are historical.*
 
 ---
 

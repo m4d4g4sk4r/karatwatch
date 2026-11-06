@@ -1,8 +1,19 @@
 # README artwork
 
-The title banner is minimal generated artwork without devices. The widget-size
-gallery is an AI-assisted composition based on user-supplied IMG_2836.PNG,
-IMG_2840.PNG, and IMG_2848.PNG captures. These staged Home Screen mockups are
-illustrative, not original screenshots. Unmodified `*-original.png` images are
-available as references. Captures show historical prices and optional API mode.
-Earlier banner alternatives are retained here; raw personal `pics/` stays ignored.
+Both published images were created with the built-in image generation tool.
+User-supplied widget captures informed the layouts and historical prices; raw
+captures remain private in ignored `pics/`. These are illustrative compositions,
+not on-device rendering tests or original iPhone screenshots.
+
+- `karatwatch-title.png`: charcoal slate and champagne-gold banner, based on the
+  first banner, with three widget cards and current KaratWatch branding.
+- `karatwatch-widget-sizes.png`: small, medium, and large widgets staged on three
+  iPhone Home Screens with dune, mountain, and copper wallpapers.
+
+Art direction prompts: restore the first banner's three-card composition on a
+brushed dark slate background, restrained gold edges and legible historical data;
+create three complete titanium iPhones with faithful widget cards, realistic app
+grids, dark icons, translucent docks, and distinct richly textured wallpapers.
+
+Home Screen styling was informed by [Apple's customization examples](https://www.apple.com/newsroom/2024/06/ios-18-makes-iphone-more-personal-capable-and-intelligent-than-ever/).
+No source webpage artwork was copied into the repository.
