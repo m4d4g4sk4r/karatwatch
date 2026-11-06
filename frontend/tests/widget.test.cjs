@@ -106,3 +106,7 @@ test('directory fetch excludes international tables and falls back to saved citi
   files.clear();
   assert.equal((await call('availableCities()')).cities.length, 0);
 });
+test('API requests replace city while preserving other query parameters', () => {
+  assert.equal(call('apiURL("https://example.com/api/metals", "mumbai")'), 'https://example.com/api/metals?city=mumbai');
+  assert.equal(call('apiURL("https://example.com/api/metals?x=1&city=delhi&%63ity=pune#fragment", "bangalore")'), 'https://example.com/api/metals?x=1&city=bangalore');
+});

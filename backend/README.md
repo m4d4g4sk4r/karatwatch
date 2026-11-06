@@ -51,6 +51,19 @@ for installation and display parameters.
 
 ## API
 
+`GET /api/metals?city=mumbai` selects a Goodreturns Indian city slug. Omit `city`
+for Ahmedabad. Names are case-insensitive; `Bengaluru` maps to `bangalore` and
+`Gurugram` to `gurgaon`. Invalid syntax returns 422. A valid slug without supported
+upstream pages returns 503 if there is no cached data; it never falls back to
+another city's prices. The widget sends this parameter automatically.
+
+Each city has its own cache file, retry/circuit state, and fetch lock. The original
+`CACHE_FILE` and configured Goodreturns URLs remain in use for Ahmedabad; other
+cities use fixed Goodreturns URLs and sibling cache files. Keep default URL overrides
+pointing to Ahmedabad. Rate limits remain shared across cities. Up to 128 additional
+cities can be active per process; further new cities return 503 until restart.
+`/health` and `/providers/status` continue to describe the default city's providers.
+
 `GET /api/metals` returns the following shape (illustrative values):
 
 ```json

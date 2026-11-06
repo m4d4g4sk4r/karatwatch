@@ -57,7 +57,7 @@ class DataNormalizer:
         return sorted(history, key=lambda x: x.get("date", ""), reverse=True)[:10]
 
     @staticmethod
-    def build_response(provider_result: ProviderResult, cached: bool = False, fallback_used: bool = False) -> MetalsResponse:
+    def build_response(provider_result: ProviderResult, cached: bool = False, fallback_used: bool = False, city: str = "Ahmedabad") -> MetalsResponse:
         now = datetime.now(IST)
         updated_at = now.isoformat()
 
@@ -67,7 +67,7 @@ class DataNormalizer:
             updated_at = provider_result.silver.timestamp.astimezone(IST).isoformat()
 
         response = MetalsResponse(
-            city="Ahmedabad",
+            city=city,
             updatedAt=updated_at,
             stale=cached,
             source={

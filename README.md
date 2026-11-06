@@ -51,9 +51,9 @@ The saved choice applies to all widgets using this installation. Prices, retry
 state, and alert thresholds are stored separately for each city. Existing Ahmedabad
 cache and alert files are preserved. Widget parameters such as `gold:7` are unchanged.
 
-In optional API mode, the response’s `city` must match the selected city. Changing
-the widget setting does not reconfigure a server; the included backend currently
-serves Ahmedabad. A mismatch is rejected rather than relabeling another city’s prices.
+In optional API mode, the response’s `city` must match the selected city. The widget sends the selected slug as a `city` query parameter,
+for example `/api/metals?city=mumbai`. The included backend isolates prices and
+provider state by city. A mismatched response is rejected.
 
 | Parameter | What you see |
 | --- | --- |

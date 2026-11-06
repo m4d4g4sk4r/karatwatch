@@ -25,7 +25,7 @@ class CacheManager:
             if self.cache_file.exists():
                 with open(self.cache_file, "r") as f:
                     data = json.load(f)
-                    self._cached_response = MetalsResponse(**data)
+                    self._cached_response = MetalsResponse(**{k: v for k, v in data.items() if not k.startswith("_")})
                     self._last_fetch_time = data.get("_last_fetch_time", 0)
                     self._last_failure_time = data.get("_last_failure_time", 0)
                     self._provider_last_attempt = data.get("_provider_last_attempt", {})
@@ -61,7 +61,8 @@ class CacheManager:
 
     def set(self, response: MetalsResponse, success: bool = True, provider: str = "default"):
         self._cached_response = response
-        self._last_fetch_time = time.time()
+        if success:
+            self._last_fetch_time = time.time()
         if not success:
             self._last_failure_time = time.time()
             self._provider_last_attempt[provider] = time.time()

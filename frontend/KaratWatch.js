@@ -858,9 +858,23 @@ async function requestDirectPrices() {
     stale: false, gold, silver, source: { provider: "goodreturns" } });
 }
 
+// Scriptable does not require the browser URL API for query replacement.
+function apiURL(value, slug) {
+  const base = value.split("#")[0];
+  const split = base.indexOf("?");
+  const path = split < 0 ? base : base.slice(0, split);
+  const query = split < 0 ? [] : base.slice(split + 1).split("&").filter(Boolean);
+  const kept = query.filter(part => {
+    try { return decodeURIComponent(part.split("=")[0]) !== "city"; }
+    catch (_) { return true; }
+  });
+  kept.push("city=" + encodeURIComponent(slug));
+  return path + "?" + kept.join("&");
+}
+
 async function requestPrices(auth) {
   const req = new Request(
-    SETTINGS.serverURL
+    apiURL(SETTINGS.serverURL, location.slug)
   );
 
   req.method = "GET";
