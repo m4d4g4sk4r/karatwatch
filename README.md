@@ -11,6 +11,21 @@ A Scriptable widget for your iPhone Home Screen — current prices, history, and
 
 </div>
 
+![KaratWatch showcase: today’s gold and silver prices, dual-purity gold history, and silver trends](docs/assets/karatwatch-showcase.png)
+
+<p align="center"><sub>Styled showcase based on actual iPhone captures. Historical example prices; captures show optional API mode.</sub></p>
+
+<details>
+<summary>View the original iPhone screenshots</summary>
+
+<p align="center">
+  <img src="docs/assets/today-original.png" width="220" alt="Original small widget with current gold and silver prices">
+  <img src="docs/assets/gold-history-original.png" width="220" alt="Original medium widget comparing 24K and 22K gold history">
+  <img src="docs/assets/silver-original.png" width="220" alt="Original small silver widget with price and sparkline">
+</p>
+
+</details>
+
 ---
 
 ## Your metals, your view

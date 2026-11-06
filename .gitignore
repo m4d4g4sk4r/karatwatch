@@ -55,3 +55,6 @@ htmlcov/
 **/data/
 .env.*
 !.env.example
+
+# Original screenshot inbox; publish only reviewed README assets
+/pics/
