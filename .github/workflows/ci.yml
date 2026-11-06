@@ -52,7 +52,7 @@ jobs:
       - name: Check container startup without fetching upstream prices
         run: |
           docker run -d --name karatwatch-ci -e HOST=0.0.0.0 -p 127.0.0.1:18765:8765 karatwatch-ci
-          curl --fail --retry 10 --retry-connrefused --retry-delay 2 http://127.0.0.1:18765/health
+          curl --fail --retry 10 --retry-connrefused --retry-all-errors --retry-delay 2 http://127.0.0.1:18765/health
       - if: always()
         run: |
           docker logs karatwatch-ci || true
