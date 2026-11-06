@@ -99,6 +99,9 @@ test('directory fetch excludes international tables and falls back to saved citi
   const fresh = await call('availableCities()');
   assert.equal(fresh.cities.map(c=>c.slug).join(','), 'mumbai');
   assert.equal(fresh.cached, false);
+  for (const [path, value] of files) {
+    if (path.endsWith("karatwatch-cities-v1.json")) files.set(path, JSON.stringify({...JSON.parse(value), fetchedAt: 0}));
+  }
   blocked = true;
   const saved = await call('availableCities()');
   assert.equal(saved.cities.map(c=>c.slug).join(','), 'mumbai');
@@ -109,4 +112,50 @@ test('directory fetch excludes international tables and falls back to saved citi
 test('API requests replace city while preserving other query parameters', () => {
   assert.equal(call('apiURL("https://example.com/api/metals", "mumbai")'), 'https://example.com/api/metals?city=mumbai');
   assert.equal(call('apiURL("https://example.com/api/metals?x=1&city=delhi&%63ity=pune#fragment", "bangalore")'), 'https://example.com/api/metals?x=1&city=bangalore');
+});
+function isolatedWidget() {
+  const files = new Map();
+  const c = vm.createContext({
+    FileManager: {local:()=>({documentsDirectory:()=>'/tmp',joinPath:(a,b)=>a+'/'+b,
+      fileExists:path=>files.has(path),readString:path=>files.get(path),
+      writeString:(path,value)=>files.set(path,value),remove:path=>files.delete(path)})},
+    Color: Object.assign(function(){}, {dynamic:()=>null})
+  });
+  vm.runInContext(source.slice(0, source.lastIndexOf('if (config.runsInWidget)')), c);
+  return {c,files,run:expression=>vm.runInContext(expression,c)};
+}
+test('upstream refusal persists across cities and honors long Retry-After', async () => {
+  const {c,run} = isolatedWidget();
+  let requests = 0;
+  c.Request = class {
+    constructor(){requests++;this.response={statusCode:429,headers:{'Retry-After':'172800'}};}
+    async loadString(){return 'blocked';}
+  };
+  await assert.rejects(()=>run('requestSourceHTML(sourceURL("gold"))'));
+  assert.ok(run('sourceCooldown().until - Date.now()') > 172799000);
+  run('applyCity("Mumbai")');
+  await assert.rejects(()=>run('requestSourceHTML(sourceURL("silver"))'));
+  assert.equal(requests,1);
+});
+test('forced refresh uses recent prices and cannot bypass failure cooldown', async () => {
+  const {c,run} = isolatedWidget();
+  c.payload = {city:'Ahmedabad',updatedAt:new Date().toISOString(),stale:false,
+    gold:{'24k':140000,'22k':130000,history:[]},silver:{price:200000,history:[]},source:{provider:'goodreturns'}};
+  let requests=0;
+  c.Request = class {constructor(){requests++;throw Error('must not fetch');}};
+  run('saveFile(cacheFile,{retrievedAt:new Date().toISOString(),data:payload})');
+  const result = await run('loadPrices(true)');
+  assert.equal(result.data.city,'Ahmedabad');
+  assert.match(result.reason,/refresh interval/);
+  run('fm.remove(cacheFile); saveFile(retryFile,{until:Date.now()+60000,label:"Request failed"})');
+  assert.equal((await run('loadPrices(true)')).reason,'Request failed');
+  assert.equal(requests,0);
+});
+test('directory cache avoids network requests for seven days', async () => {
+  const {c,run} = isolatedWidget();
+  c.Request = class {constructor(){throw Error('must use directory cache');}};
+  run('saveFile(fm.joinPath(fm.documentsDirectory(),"karatwatch-cities-v1.json"),{fetchedAt:Date.now(),links:[{href:"/gold-rates/mumbai.html"}]})');
+  const result=await run('availableCities()');
+  assert.equal(result.cities[0].slug,'mumbai');
+  assert.equal(result.cached,true);
 });

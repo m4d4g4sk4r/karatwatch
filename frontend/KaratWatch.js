@@ -1,6 +1,30 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: gray; icon-glyph: magic;
+/*
+SPDX-License-Identifier: MIT
+MIT License
+
+Copyright (c) 2026 m4d4g4sk4r
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
 // KARATWATCH — SCRIPTABLE
 // Configurable Indian city; Ahmedabad by default
 //
@@ -26,10 +50,11 @@ const SETTINGS = {
   city: "Ahmedabad",
   serverURL: "", // Optional: your authenticated /api/metals endpoint
   webTimeoutSeconds: 12,
+  minimumRefreshMinutes: 30,
   serverTimeoutSeconds: 6,
   // Prices are fetched once a day at this
   // local time. Tapping the widget or using
-  // "Refresh prices now" fetches immediately.
+  // "Refresh prices now" respects the minimum interval and source cooldowns.
   refreshHour: 5,
   refreshMinute: 0,
   defaultHistoryDays: 4
@@ -95,13 +120,44 @@ function parseCityLinks(links) {
   return Array.from(cities.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+const sourceHoldFile = fm.joinPath(fm.documentsDirectory(), "karatwatch-source-hold-v1.json");
+
+function sourceCooldown() {
+  const hold = readFile(sourceHoldFile);
+  return hold && hold.until > Date.now() ? hold : null;
+}
+
+async function requestSourceHTML(url) {
+  const hold = sourceCooldown();
+  if (hold) throw { label: hold.label, wait: hold.until - Date.now() };
+  const req = new Request(url);
+  req.timeoutInterval = SETTINGS.webTimeoutSeconds;
+  req.headers = { "User-Agent": "KaratWatch/1.0 (+https://github.com/m4d4g4sk4r/karatwatch)" };
+  const html = await req.loadString();
+  const response = req.response || {};
+  const code = Number(response.statusCode);
+  if (code !== 200) {
+    const refusal = [401, 403].includes(code);
+    const wait = Math.max(refusal ? 86400000 : 1800000,
+      retryMilliseconds(headerValue(response.headers || {}, "retry-after")));
+    const label = refusal ? "Goodreturns access denied; paused" : "Goodreturns unavailable; retry later";
+    saveFile(sourceHoldFile, { until: Date.now() + wait, label });
+    throw { label, wait };
+  }
+  return html;
+}
+
 async function availableCities() {
   const path = fm.joinPath(fm.documentsDirectory(), "karatwatch-cities-v1.json");
+  const stored = readFile(path);
+  const linksFromCache = Array.isArray(stored) ? stored : (stored && stored.links) || [];
+  const previous = parseCityLinks(linksFromCache);
+  if (previous.length && stored.fetchedAt > Date.now() - 7 * 86400000) {
+    return { cities: previous, cached: true };
+  }
+  if (stored && stored.retryAt > Date.now()) return { cities: previous, cached: true };
   try {
-    const req = new Request("https://www.goodreturns.in/gold-rates/");
-    req.timeoutInterval = SETTINGS.webTimeoutSeconds;
-    const html = await req.loadString();
-    if (Number((req.response || {}).statusCode) !== 200) throw Error("Directory unavailable");
+    const html = await requestSourceHTML("https://www.goodreturns.in/gold-rates/");
     const view = new WebView();
     await view.loadHTML("<html><body></body></html>");
     const links = await view.evaluateJavaScript(`(() => {
@@ -121,11 +177,11 @@ async function availableCities() {
     })()`);
     const cities = parseCityLinks(links);
     if (!cities.length) throw Error("City directory format changed");
-    saveFile(path, links);
+    saveFile(path, { links, fetchedAt: Date.now() });
     return { cities, cached: false };
   } catch (_) {
-    const saved = readFile(path);
-    return { cities: Array.isArray(saved) ? parseCityLinks(saved) : [], cached: true };
+    saveFile(path, { links: linksFromCache, fetchedAt: stored && stored.fetchedAt || 0, retryAt: Date.now() + 1800000 });
+    return { cities: previous, cached: true };
   }
 }
 
@@ -133,7 +189,7 @@ async function changeCity() {
   const directory = await availableCities();
   const options = directory.cities.map(city => city.name);
   options.push("Enter another city manually");
-  const selected = await choose(directory.cached ? "Choose city (offline list)" : "Choose city", options);
+  const selected = await choose(directory.cached ? "Choose city (saved list)" : "Choose city", options);
   if (selected < 0) return;
   let value;
   if (selected < directory.cities.length) {
@@ -789,10 +845,7 @@ function retryMilliseconds(value) {
   if (/^\d+$/.test(value.trim())) {
     return Math.max(
       60000,
-      Math.min(
-        86400000,
-        Number(value) * 1000
-      )
+      Number(value) * 1000
     );
   }
 
@@ -801,10 +854,7 @@ function retryMilliseconds(value) {
   return isFinite(until)
     ? Math.max(
         60000,
-        Math.min(
-          86400000,
-          until - Date.now()
-        )
+        until - Date.now()
       )
     : 15 * 60000;
 }
@@ -835,12 +885,7 @@ function parseSourceTables(tables, metal) {
 
 async function requestDirectPrices() {
   async function fetchMetal(metal) {
-    const req = new Request(sourceURL(metal));
-    req.timeoutInterval = SETTINGS.webTimeoutSeconds;
-    const html = await req.loadString();
-    if (Number((req.response || {}).statusCode) !== 200) {
-      throw { label: "Goodreturns unavailable or blocked", wait: 15 * 60000 };
-    }
+    const html = await requestSourceHTML(sourceURL(metal));
     // Parse inert HTML locally. Do not execute remote scripts or load page assets.
     const view = new WebView();
     await view.loadHTML("<html><body></body></html>");
@@ -853,7 +898,8 @@ async function requestDirectPrices() {
     })()`);
     return parseSourceTables(tables, metal);
   }
-  const [gold, silver] = await Promise.all([fetchMetal("gold"), fetchMetal("silver")]);
+  const gold = await fetchMetal("gold");
+  const silver = await fetchMetal("silver");
   return validate({ city: SETTINGS.city, updatedAt: new Date().toISOString(),
     stale: false, gold, silver, source: { provider: "goodreturns" } });
 }
@@ -1011,23 +1057,19 @@ async function loadPrices(force) {
   // scheduled refresh time: use cache.
 
   if (
-    !force &&
-    cache &&
-    Date.parse(cache.retrievedAt) >=
-      lastScheduledRefresh(now)
+    cache && (
+      now - Date.parse(cache.retrievedAt) < SETTINGS.minimumRefreshMinutes * 60000 ||
+      (!force && Date.parse(cache.retrievedAt) >= lastScheduledRefresh(now))
+    )
   ) {
-    return fallback("", false);
+    return fallback("Using saved prices; refresh interval applies", false);
   }
 
   const hold = readFile(retryFile);
 
   if (
     hold &&
-    hold.until > now &&
-    (
-      !force ||
-      hold.label === "Rate limited (429)"
-    )
+    hold.until > now
   ) {
     return fallback(
       hold.label || "Retry later",
@@ -1428,10 +1470,9 @@ function footer(w, state, size) {
 
   label(
     f,
-    (
-      state.data &&
-      state.data.source
-    ) || "METALS API",
+    state.data && state.data.source === "goodreturns"
+      ? (size === "small" ? "Goodreturns" : "Goodreturns · Indicative")
+      : ((state.data && state.data.source) || "METALS API"),
     t.meta,
     colors.muted
   );
@@ -2300,7 +2341,7 @@ async function refreshNow() {
           )
         : s.data.stale
           ? "Valid data received. Server reports STALE."
-          : "Latest gold and silver prices received."
+          : (s.reason || "Latest gold and silver prices received.")
     ) +
     (
       hits.length
@@ -2308,6 +2349,17 @@ async function refreshNow() {
         : ""
     )
   );
+}
+
+async function sourceInformation() {
+  const a = new Alert();
+  a.title = "Data source & disclaimer";
+  a.message = "Prices sourced from Goodreturns.in. KaratWatch is an independent, noncommercial project, not affiliated with or endorsed by Goodreturns. Rates are indicative, may be delayed or inaccurate, and are not financial advice or transaction quotes. Verify with the source and your jeweller before acting. The widget shows price dates and fetch times; saved prices may be stale. The software license does not grant rights to source data.";
+  a.addAction("View gold source");
+  a.addAction("View silver source");
+  a.addCancelAction("Close");
+  const choice = await a.presentAlert();
+  if (choice === 0 || choice === 1) await Safari.open(sourceURL(choice === 0 ? "gold" : "silver"));
 }
 
 async function runApp() {
@@ -2343,7 +2395,8 @@ async function runApp() {
         "Price alerts",
         "Set / replace credentials",
         "Remove credentials",
-        "Change city (" + SETTINGS.city + ")"
+        "Change city (" + SETTINGS.city + ")",
+        "Data source & disclaimer"
       ]
     );
 
@@ -2363,6 +2416,10 @@ async function runApp() {
 
     if (n === 3) {
       await setup();
+    }
+
+    if (n === 6) {
+      await sourceInformation();
     }
 
     if (n === 5) {

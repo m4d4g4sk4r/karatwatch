@@ -1,21 +1,27 @@
 import re
+import time
+from email.utils import parsedate_to_datetime
+from urllib.parse import urlsplit
 import httpx
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Set
 from bs4 import BeautifulSoup
 
 from providers.base import BaseProvider, ProviderConfig
-from models.prices import ProviderCapability, GoldPrice, SilverPrice
+from models.prices import ProviderCapability, GoldPrice, SilverPrice, ProviderResult
 
 
 class GoodreturnsProvider(BaseProvider):
+    # Share upstream refusal cooldowns across all city instances in this process.
+    _blocked_until = {}
+
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self.gold_url = config.custom_config.get("gold_url", "https://www.goodreturns.in/gold-rates/ahmedabad.html")
         self.silver_url = config.custom_config.get("silver_url", "https://www.goodreturns.in/silver-rates/ahmedabad.html")
         self.client = httpx.AsyncClient(
             timeout=config.timeout,
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            headers={"User-Agent": "KaratWatch/1.0 (+https://github.com/m4d4g4sk4r/karatwatch)"}
         )
 
     @property
@@ -59,12 +65,41 @@ class GoodreturnsProvider(BaseProvider):
         silver = self._parse_silver(html)
         return silver.history[:days] if silver else []
 
+    async def fetch_all(self) -> ProviderResult:
+        # Each page already contains current and historical prices. Fetch it once.
+        gold = await self.fetch_current_gold()
+        silver = await self.fetch_current_silver() if gold else None
+        success = gold is not None and silver is not None
+        if success:
+            self._record_success()
+        else:
+            self._record_failure("Source unavailable, blocked, or invalid")
+        return ProviderResult(provider=self.name, gold=gold, silver=silver,
+                              success=success,
+                              error=None if success else "Source unavailable, blocked, or invalid")
+
+    @staticmethod
+    def retry_seconds(value: str, default: float) -> float:
+        try:
+            seconds = float(value) if value.strip().isdigit() else parsedate_to_datetime(value).timestamp() - time.time()
+            return max(default, seconds)
+        except (ValueError, TypeError, OverflowError):
+            return default
+
     async def _fetch_html(self, url: str) -> Optional[str]:
+        origin = urlsplit(url).netloc
+        if self._blocked_until.get(origin, 0) > time.time():
+            return None
         try:
             response = await self.client.get(url)
+            if response.status_code in (401, 403, 429, 503):
+                default = 86400 if response.status_code in (401, 403) else 1800
+                wait = self.retry_seconds(response.headers.get("Retry-After", ""), default)
+                self._blocked_until[origin] = time.time() + wait
+                return None
             response.raise_for_status()
             return response.text
-        except Exception as e:
+        except httpx.HTTPError:
             return None
 
     def _parse_gold(self, html: str) -> Optional[GoldPrice]:

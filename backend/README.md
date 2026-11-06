@@ -106,3 +106,19 @@ upstream data can return 401/403, 429, and 503 respectively.
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for tests and PR checks.
 Keep `.env` and tunnel credentials out of Git. Previously exposed credentials were rotated and repository history cleaned.
+
+## Upstream request policy
+
+The Goodreturns provider identifies itself as KaratWatch and fetches each metal's
+page once for both current prices and history. The default 30-minute response cache
+reduces repeat requests. A 401/403 response pauses requests to that source host for
+at least 24 hours; 429/503 pauses for at least 30 minutes. Longer Retry-After values,
+including HTTP dates, are respected. These holds are shared across city providers
+within a process and are reset by a process restart; do not restart to evade a block.
+
+API source metadata includes attribution, source-page links, and an indicative-data
+notice. Existing cached responses acquire this metadata on their next successful fetch.
+Keep this service authenticated for your own use. Do not advertise access to a shared
+pricing API without source permission. Setting `METALS_PROVIDERS` to an empty value
+and restarting disables new provider fetches (previously cached responses may remain).
+See the root README for the distinction between the software license and data rights.
