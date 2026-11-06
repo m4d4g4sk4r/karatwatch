@@ -76,6 +76,15 @@ class DataNormalizer:
             }
         )
 
+        if provider_result.provider == "goodreturns":
+            slug = city.lower().replace(" ", "-")
+            response.source.update({
+                "name": "Goodreturns",
+                "goldUrl": f"https://www.goodreturns.in/gold-rates/{slug}.html",
+                "silverUrl": f"https://www.goodreturns.in/silver-rates/{slug}.html",
+                "notice": "Indicative third-party prices; verify before use. Not financial advice. No affiliation or endorsement."
+            })
+
         if provider_result.gold:
             gold = provider_result.gold
             if not cached:

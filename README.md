@@ -44,7 +44,7 @@ No backend setup is needed. `SETTINGS.serverURL` is empty by default.
 **Choose your city:** run the script and select **Change city**. Ahmedabad is the
 initial default. The picker loads the Indian cities table from the
 [Goodreturns gold directory](https://www.goodreturns.in/gold-rates/), with a saved
-list available offline. You can also enter a city slug manually, such as `mumbai`,
+list available offline and refreshed at most weekly. You can also enter a city slug manually, such as `mumbai`,
 `chennai`, or `bangalore` (`Bengaluru` also works). The city must have both gold and
 silver pages with the supported table format; unavailable pages show a fetch error.
 The saved choice applies to all widgets using this installation. Prices, retry
@@ -66,7 +66,8 @@ provider state by city. A mismatched response is rejected.
 
 History length supports 2–10 rows. Consecutive unchanged prices may share a displayed row.
 The default refresh schedule is 05:00 in the phone’s local timezone; iOS determines
-actual execution times. Tap to refresh or use the in-app menu. Alerts run when the
+actual execution times. Manual refresh respects a 30-minute minimum per city and
+active failure cooldowns. Alerts run when the
 script executes, not as an always-on background monitor.
 
 ## Two ways to get prices
@@ -121,3 +122,29 @@ copies or substantial portions of the software.
 
 Prices are third-party, indicative data; this software license does not grant rights
 to Goodreturns content or change its terms. See the license for the full terms.
+
+## Data attribution and responsible use
+
+Prices come from [Goodreturns](https://www.goodreturns.in/gold-rates/). KaratWatch
+is an independent, noncommercial project with no Goodreturns affiliation or
+endorsement. In the widget, **Data source & disclaimer** links to the selected
+city's original gold and silver pages. Displayed price dates and fetch timestamps
+help distinguish dated rates from recent retrievals; offline/stale labels remain visible.
+Rates may be delayed or inaccurate: verify with the source and your jeweller before
+acting. This is not financial advice, a trading feed, or a guaranteed transaction quote.
+
+The software extracts a limited set of prices and up to ten historical rows, not
+articles, photos, or page layouts. Direct mode normally refreshes daily, with a
+30-minute minimum for manual refreshes. Access refusals pause source requests for
+at least 24 hours; rate limits pause them for at least 30 minutes, respecting longer
+Retry-After values. These holds cover all cities on the device. There are no CAPTCHA,
+login, proxy-rotation, or anti-bot bypasses. Cached data is used when available.
+
+These measures **do not establish fair use/fair dealing or grant data permission**.
+Noncommercial intent and attribution are not substitutes for authorization. Review
+[the source's linked terms](https://www.greynium.com/terms-of-service.html) and
+[accuracy disclaimer](https://www.goodreturns.in/disclaimer.html). Obtain permission
+covering automated access and redistribution, or use an appropriately licensed source,
+before offering a shared data service. Source rights are separate from the MIT software
+license, which permits commercial use of the code as well. If the source owner objects,
+stop fetching its data while resolving permission; do not work around access blocks.

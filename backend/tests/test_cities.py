@@ -43,6 +43,8 @@ def test_default_city_aliases_and_isolated_caches(api):
     mumbai = client.get('/api/metals', params={'city': ' Mumbai '})
     assert mumbai.status_code == 200
     assert mumbai.json()['city'] == 'Mumbai'
+    assert mumbai.json()['source']['goldUrl'] == 'https://www.goodreturns.in/gold-rates/mumbai.html'
+    assert 'Indicative' in mumbai.json()['source']['notice']
     assert mumbai.json()['gold']['24k'] != default.json()['gold']['24k']
     assert client.get('/api/metals?city=MUMBAI').json() == mumbai.json()
     assert calls == {'ahmedabad': 1, 'mumbai': 1}
