@@ -12,7 +12,7 @@ Direct Goodreturns fetching is the default. The FastAPI backend is optional.
 - `backend/services/`: cache, normalization, and validation.
 - `backend/models/prices.py`: response dataclasses.
 - `backend/tests/`: pytest suite.
-- `docs/assets/`: reviewed README images and provenance.
+- `assets/`: reviewed README images and provenance.
 
 ## Documentation
 

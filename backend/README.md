@@ -92,5 +92,4 @@ upstream data can return 401/403, 429, and 503 respectively.
 ## Development
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for tests and PR checks.
-Keep `.env` and tunnel credentials out of Git. See the
-[remediation note](../docs/SECURITY-REMEDIATION.md) for historical credential cleanup.
+Keep `.env` and tunnel credentials out of Git. Previously exposed credentials were rotated and repository history cleaned.

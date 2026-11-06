@@ -11,17 +11,21 @@ A Scriptable widget for your iPhone Home Screen — current prices, history, and
 
 </div>
 
-![KaratWatch: small, medium, and large widgets in a minimal iPhone-style presentation](docs/assets/karatwatch-showcase-minimal.png)
+![KaratWatch — Gold & silver. A glance away.](assets/karatwatch-title.png)
 
-<p align="center"><sub>AI-assisted Home Screen mockup based on actual widget captures; arrangement is illustrative. Original captures below show historical prices, optional API mode, and the earlier heading.</sub></p>
+## At home on your Home Screen
+
+![Small, medium, and large KaratWatch widgets in staged iPhone Home Screen mockups](assets/karatwatch-widget-sizes.png)
+
+*AI-assisted mockups based on actual widget captures; layouts are illustrative and prices historical.*
 
 <details>
 <summary>View the original iPhone screenshots</summary>
 
 <p align="center">
-  <img src="docs/assets/today-original.png" width="220" alt="Original small widget with current gold and silver prices">
-  <img src="docs/assets/gold-history-original.png" width="220" alt="Original medium widget comparing 24K and 22K gold history">
-  <img src="docs/assets/silver-original.png" width="220" alt="Original small silver widget with price and sparkline">
+  <img src="assets/today-original.png" width="220" alt="Original small widget with current gold and silver prices">
+  <img src="assets/gold-history-original.png" width="220" alt="Original medium widget comparing 24K and 22K gold history">
+  <img src="assets/silver-original.png" width="220" alt="Original small silver widget with price and sparkline">
 </p>
 
 </details>
@@ -104,6 +108,6 @@ verification. The source is currently Ahmedabad-specific. Avoid changing only th
 city label: the source URLs and validation must agree.
 
 Credentials belong in Keychain or ignored `.env` files. Historical credentials were
-rotated and repository history cleaned; see [remediation notes](docs/SECURITY-REMEDIATION.md).
+rotated and repository history cleaned. Re-clone old checkouts rather than merging old history. Cached GitHub views or downloaded copies can retain revoked values.
 The ignored personal widget is never published. No redistribution license has been
 selected yet.
