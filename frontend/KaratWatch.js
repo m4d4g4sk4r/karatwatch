@@ -484,7 +484,7 @@ async function notifyAlerts(data) {
     try {
       const n = new Notification();
 
-      n.title = "Precious Metals alert";
+      n.title = "KaratWatch alert";
       n.body = text;
       n.sound = "default";
 
@@ -1381,7 +1381,7 @@ function emptyWidget(
     w,
     mode.type === "silver"
       ? "SILVER"
-      : "PRECIOUS METALS",
+      : "KARATWATCH",
     size,
     colors.gold
   );
@@ -1548,7 +1548,7 @@ function todayWidget(state, size) {
 
   titleRow(
     w,
-    "PRECIOUS METALS",
+    "KARATWATCH",
     size,
     colors.gold,
     triggeredAlerts(data).length > 0
