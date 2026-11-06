@@ -11,3 +11,8 @@ regex = '''cfast_[A-Za-z0-9_-]{20,}'''
 id = "legacy-placeholder-key"
 description = "Previously deployed weak API key"
 regex = '''test-api-key-[0-9]{5,}'''
+
+# Exact marker inserted when historical secrets were removed; not a live value.
+[allowlist]
+regexTarget = "secret"
+regexes = ['''^(REMOVED_CREDENTIAL|YOUR_API_KEY)$''']
