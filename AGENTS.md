@@ -1,134 +1,56 @@
-# Precious Metals API - Agent Instructions
+# KaratWatch — agent instructions
 
-## Project Overview
-A FastAPI-based backend service that fetches gold and silver prices for Ahmedabad, India from multiple providers, with caching, rate limiting, and failover. Includes a Scriptable iOS widget for displaying prices.
+## Product and code
 
-## Architecture
-```
-backend/          # FastAPI backend service
-├── main.py       # Entry point, FastAPI app, endpoints
-├── providers/    # Provider abstraction layer
-│   ├── base.py   # Base provider class, ProviderManager
-│   ├── goodreturns.py  # Goodreturns.in scraper
-│   └── manager.py      # Provider failover logic
-├── services/     # Business logic
-│   ├── cache.py  # File-based caching with TTL
-│   ├── normalizer.py   # Response normalization
-│   └── validator.py    # Data validation
-├── models/       # Pydantic models
-│   └── prices.py # MetalsResponse, ProviderResult, etc.
-├── tests/        # Unit tests
-├── requirements.txt
-├── Dockerfile
-└── docker-compose.yml
+KaratWatch is a Scriptable iOS widget for Ahmedabad gold and silver prices.
+Direct Goodreturns fetching is the default. The FastAPI backend is optional.
 
-frontend/         # Scriptable iOS widget
-└── Price history.js    # Main widget script
+- `frontend/KaratWatch.js`: public standalone widget, no personal endpoint.
+- `frontend/tests/`: Node behavior tests; no npm dependencies.
+- `backend/main.py`: API entry point and authentication.
+- `backend/providers/`: provider abstraction, Goodreturns scraper, and failover.
+- `backend/services/`: cache, normalization, and validation.
+- `backend/models/prices.py`: response dataclasses.
+- `backend/tests/`: pytest suite.
+- `assets/`: reviewed README images and provenance.
 
-docs/             # Documentation
-├── README.md
-├── INSTRUCTIONS.md
-├── CLOUDFLARE_SETUP_GUIDE.md
-├── CLOUDFLARE_DEBUG_GUIDE.md
-└── DEPLOYMENT_SUMMARY.md
+## Documentation
 
-scripts/          # Deployment scripts
-├── cloudflared-config.yml
-└── tunnel-credentials.json  # GITIGNORED - contains secrets
-```
+Root README covers the widget. `backend/README.md` covers optional hosting and
+API format. `CONTRIBUTING.md` covers development and CI. Do not recreate
+historical deployment diaries or duplicate these guides.
 
-## Key Features
-- **Multi-provider architecture**: Easy to add new price sources
-- **Failover**: Automatically tries next provider on failure
-- **Caching**: File-based cache with TTL and retry cooldown
-- **Rate limiting**: Per-IP and global limits
-- **Authentication**: API key or Cloudflare Access service tokens
-- **Data validation**: Validates all provider responses
-- **Scriptable widget**: iOS home screen widget with history charts
+## Checks
 
-## Development Setup
 ```bash
+node --test frontend/tests/*.test.cjs
+node --input-type=module --check < frontend/KaratWatch.js
+python -m compileall -q backend
 cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp ../.env.example .env  # Edit with your values
-python main.py
+python -m pytest tests -v
 ```
 
-## Testing
-```bash
-cd backend
-pytest tests/ -v
-```
+Run `python3 scripts/check_publication.py` from root after staging changes.
+Gitleaks scans fetched history in CI. CI never deploys or uses production secrets.
+Node tests do not verify Scriptable rendering; disclose on-device testing limits.
+Default branch is `main`; publish changes through PRs.
 
-## Docker
-```bash
-cd backend
-docker-compose up -d --build
-```
+## Data and compatibility
 
-## Configuration (.env)
-| Variable | Description |
-|----------|-------------|
-| API_KEY | Random string for API key auth |
-| CF_ACCESS_CLIENT_ID | Cloudflare Access service token ID |
-| CF_ACCESS_CLIENT_SECRET | Cloudflare Access service token secret |
-| METALS_PROVIDERS | Comma-separated provider names |
-| CACHE_TTL_SECONDS | Cache freshness (default 1800) |
-| RETRY_COOLDOWN_SECONDS | Retry delay after failure (default 120) |
-| RATE_LIMIT_PER_IP_PER_MINUTE | Per-IP rate limit |
-| RATE_LIMIT_GLOBAL_PER_MINUTE | Global rate limit |
+Gold: INR per 10 grams. Silver: INR per kilogram. Never fabricate missing data.
+Preserve local cache and Keychain names when changing display branding.
+Keychain entries: `metals.cf-id`, `metals.cf-secret`, `metals.api-key`.
+API mode sends all three configured headers; direct mode needs no credentials.
+Parameters include `today`, `gold`, `gold:7`, `gold:24k`, `gold:22k:7`, `silver:7`.
+New providers implement the interface in `backend/providers/base.py` and are
+registered in the provider manager; update configuration and tests together.
 
-## API Endpoints
-- `GET /api/metals` - Current gold/silver prices (requires auth)
-- `GET /health` - Health check (no auth)
-- `GET /providers/status` - Provider status (requires auth)
+## Private files and deployment
 
-## Adding a New Provider
-1. Create `backend/providers/newprovider.py` extending `BaseProvider`
-2. Implement `fetch_gold()`, `fetch_silver()`, `fetch_gold_history()`, `fetch_silver_history()`
-3. Add to `ProviderManager` in `backend/main.py`
-4. Add config to `.env.example`
-
-## Security Notes
-- **Never commit `.env`** - contains real credentials
-- **Never commit `scripts/tunnel-credentials.json`** - Cloudflare tunnel credentials
-- **Never commit `frontend/Price history.js`** - contains personal domain
-- Use `.env.example` as template
-- Rotate API keys if accidentally committed
-
-## Deployment
-- Backend: Docker container behind Cloudflare Tunnel
-- Frontend: Scriptable widget runs on iOS, fetches from tunnel URL
-- Cloudflare Access protects the API endpoint
-
-## Widget Configuration
-The Scriptable widget requires these in Keychain:
-- `metals.cf-id` - Cloudflare Access Client ID
-- `metals.cf-secret` - Cloudflare Access Client Secret
-- `metals.api-key` - Backend API key
-
-Widget parameter examples:
-- `today` - All three prices
-- `gold` - Gold 24K + 22K history
-- `gold:7` - Gold history, 7 rows
-- `gold:24k` - Gold 24K only
-- `silver` - Silver history
-
-## Common Tasks
-- **Update provider URLs**: Edit `.env` GOODRETURNS_GOLD_URL/SILVER_URL
-- **Change cache TTL**: Edit CACHE_TTL_SECONDS
-- **Adjust rate limits**: Edit RATE_LIMIT_* variables
-- **Add provider**: See "Adding a New Provider" above
-- **Debug provider**: Check `/providers/status` endpoint
-- **Clear cache**: Delete `data/cache.json`
-
-## File Permissions
-- `data/` directory must be writable by container user
-- `scripts/tunnel-credentials.json` - 600 (owner read/write only)
-
-## Monitoring
-- Health check: `GET /health`
-- Logs: `docker-compose logs -f metals-api`
-- Provider status: `GET /providers/status` (authenticated)
+Never commit `.env`, `scripts/tunnel-credentials.json`, personal
+`frontend/Price history.js`, or `frontend/scriptable-config.js`.
+Use `.env.example`; rotate exposed secrets. Keep raw `pics/` ignored.
+Tunnel credentials must have mode 600. Container cache storage must be writable
+by its unprivileged user. Preserve existing deployment names and unrelated services.
+See backend README for Compose startup. Local `/health` is unauthenticated;
+`/api/metals` and `/providers/status` require authentication.

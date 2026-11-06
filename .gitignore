@@ -50,3 +50,11 @@ env/
 # Test coverage
 .coverage
 htmlcov/
+# Local feed downloads and nested runtime data
+/*-fb.xml
+**/data/
+.env.*
+!.env.example
+
+# Original screenshot inbox; publish only reviewed README assets
+/pics/

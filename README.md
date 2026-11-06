@@ -1,253 +1,102 @@
-# Precious Metals API
+<div align="center">
 
-A production-quality REST API for gold and silver prices in Ahmedabad, India, designed for iOS Scriptable widgets with a modular, extensible provider architecture.
+# KaratWatch
+### Gold & silver. A glance away.
 
-## Features
+A Scriptable widget for your iPhone Home Screen — current prices, history, and alerts for Ahmedabad.
 
-- **Multi-provider architecture**: Easy to add new price providers
-- **Automatic failover**: Falls back to next provider on failure
-- **Circuit breaker**: Prevents hammering failing providers
-- **Caching**: 30-minute TTL with persistent disk cache
-- **Rate limiting**: Per-IP and global limits at application and Cloudflare edge
-- **Authentication**: Cloudflare Access service tokens + API key fallback
-- **Security**: Cloudflare Tunnel, WAF, origin isolation
-- **Compatible**: Works with Scriptable widget implementation
+[![CI](https://github.com/m4d4g4sk4r/karatwatch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/m4d4g4sk4r/karatwatch/actions/workflows/ci.yml)
 
-## Quick Start
+[**Get the widget**](frontend/KaratWatch.js) · [Setup](#on-your-home-screen) · [Optional backend](backend/README.md) · [Contribute](CONTRIBUTING.md)
+
+</div>
+
+![KaratWatch — Gold & silver. A glance away.](assets/karatwatch-title.png)
+
+## KaratWatch on iPhone
+
+![Small, medium, and large KaratWatch widgets in staged iPhone Home Screen mockups](assets/karatwatch-widget-sizes.png)
+
+*Illustrative iPhone Home Screen previews; prices shown are historical.*
+
+---
+
+## Your metals, your view
+
+- **Today at a glance:** 24K gold, 22K gold, and silver with clearly labelled units.
+- **Look back:** dated history, price changes, and compact charts in small, medium, and large widgets.
+- **Make it yours:** light/dark appearance, configurable history length, and price alerts.
+- **Keep useful data:** validated local caching with visible offline and stale states.
+- **Start without a server:** the widget fetches Goodreturns directly. No API credentials are required in the default mode.
+
+Gold is shown in INR per **10 grams**, silver per **kilogram**. Prices are indicative source rates, not guaranteed transaction quotes.
+
+## On your Home Screen
+
+1. Install **Scriptable** on your iPhone.
+2. Open [KaratWatch.js](frontend/KaratWatch.js), select **Raw**, and copy the script into a new Scriptable script named **KaratWatch**.
+3. Run the script in Scriptable. Choose **Refresh prices now**, then preview your widget.
+4. Add a Scriptable widget to your Home Screen, edit it, and choose KaratWatch.
+5. Enter one of the parameters below. Leave it empty for today’s prices.
+
+No backend setup is needed. `SETTINGS.serverURL` is empty by default.
+
+| Parameter | What you see |
+| --- | --- |
+| `today` | Gold 24K, gold 22K, and silver |
+| `gold` | Both gold purities and history |
+| `gold:7` | Both gold purities, seven history rows |
+| `gold:24k` | Only 24K gold |
+| `gold:22k:7` | Only 22K gold, seven history rows |
+| `silver` / `silver:7` | Silver history |
+
+History length supports 2–10 rows. Consecutive unchanged prices may share a displayed row.
+The default refresh schedule is 05:00 in the phone’s local timezone; iOS determines
+actual execution times. Tap to refresh or use the in-app menu. Alerts run when the
+script executes, not as an always-on background monitor.
+
+## Two ways to get prices
+
+**Direct — default.** Your phone requests the Ahmedabad gold and silver pages,
+parses their price tables, validates the result, and saves a local cache. No account
+or credentials. Site blocking, unavailable pages, or layout changes can interrupt
+updates; the widget shows cached data where available. It does not bypass challenges.
+
+**Your API — optional.** Set `SETTINGS.serverURL` to a compatible `/api/metals`
+endpoint and configure its credentials in the in-app menu. The included
+[FastAPI backend](backend/README.md) adds shared caching, provider extensibility,
+failover machinery, and rate limits. You do not need to deploy it to use the widget.
+In API mode, requests use all three configured headers; failures use local cache.
+Switching modes does not automatically change your installed personal script.
+
+## For developers
+
+KaratWatch lives in [`frontend/KaratWatch.js`](frontend/KaratWatch.js).
+The backend is an optional supporting component in `backend/`.
 
 ```bash
+# Widget behavior tests — no npm dependencies
+node --test frontend/tests/*.test.cjs
+# Syntax validation (Scriptable supports top-level await)
+node --input-type=module --check < frontend/KaratWatch.js
+# Optional backend tests, after installing backend/requirements.txt
 cd backend
-
-# 1. Configure environment
-cp ../.env.example .env
-# Edit .env with your settings
-
-# 2. Start API
-docker compose up -d
-
-# 3. Verify
-curl -H "X-Metals-Api-Key: your-key" http://127.0.0.1:8765/api/metals
+python -m pytest tests -v
 ```
 
-## Architecture
+Every PR runs widget tests and syntax checks, Python 3.11/3.12 tests and compilation,
+Gitleaks history scanning, publication checks, and Docker build/startup verification.
+CI never deploys or needs production credentials. Node tests exercise parsing and
+validation; they do not emulate Scriptable WebView or verify iPhone rendering.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Cloudflare Edge                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │    WAF      │  │ Rate Limit  │  │ Cloudflare Access   │  │
-│  │ (block non- │  │ (20/10s/IP) │  │ (Service Token)     │  │
-│  │  API paths) │  │             │  │                     │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
-└─────────────────────────┬───────────────────────────────────┘
-                          │ HTTPS
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Cloudflare Tunnel (precious-metals-api)         │
-└─────────────────────────┬───────────────────────────────────┘
-                          │ HTTP
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Home Server                               │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              Precious Metals API (Docker)            │    │
-│  │  ┌──────────┐ ┌──────────┐ ┌────────┐ ┌──────────┐  │    │
-│  │  │ Provider │ │ Provider │ │ Cache  │ │ Rate     │  │    │
-│  │  │ Manager  │ │ Registry │ │ Manager│ │ Limiter  │  │    │
-│  │  └──────────┘ └──────────┘ └────────┘ └──────────┘  │    │
-│  │         │           │                                │    │
-│  │         ▼           ▼                                │    │
-│  │  ┌────────────────────────────────────────────────┐  │    │
-│  │  │           GoodreturnsProvider                  │  │    │
-│  │  │  • fetch_current_gold()                        │  │    │
-│  │  │  • fetch_current_silver()                      │  │    │
-│  │  │  • fetch_historical_gold()                     │  │    │
-│  │  │  • fetch_historical_silver()                   │  │    │
-│  │  └────────────────────────────────────────────────┘  │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-```
+## Status and privacy
 
-## Provider Architecture
+Direct mode has automated parser tests; on-device Scriptable execution still needs
+verification. The source is currently Ahmedabad-specific. Avoid changing only the
+city label: the source URLs and validation must agree.
 
-The API uses an extensible provider system:
-
-```python
-# Adding a new provider only requires:
-class NewProvider(BaseProvider):
-    @property
-    def name(self): return "newprovider"
-    
-    @property
-    def capabilities(self): return {CURRENT_GOLD, CURRENT_SILVER, ...}
-    
-    async def fetch_current_gold(self): ...
-    async def fetch_current_silver(self): ...
-    async def fetch_historical_gold(self): ...
-    async def fetch_historical_silver(self): ...
-
-# Then register in config:
-METALS_PROVIDERS=goodreturns,newprovider
-```
-
-Currently implemented:
-- **GoodreturnsProvider**: Scrapes gold/silver rates from goodreturns.in
-
-## API Endpoint
-
-**GET** `/api/metals`
-
-### Response Format
-```json
-{
-  "city": "Ahmedabad",
-  "updatedAt": "2026-11-06T14:36:47+05:30",
-  "stale": false,
-  "gold": {
-    "24k": 143510,
-    "22k": 131550,
-    "history": [
-      {"date": "2026-11-06", "24k": 143510, "22k": 131550},
-      {"date": "2026-11-05", "24k": 146070, "22k": 133900}
-    ]
-  },
-  "silver": {
-    "price": 205000,
-    "history": [
-      {"date": "2026-11-06", "price": 205000},
-      {"date": "2026-11-05", "price": 210000}
-    ]
-  },
-  "source": {
-    "provider": "goodreturns",
-    "fallbackUsed": false
-  }
-}
-```
-
-### Authentication
-- **Cloudflare Access** (preferred): `CF-Access-Client-Id` + `CF-Access-Client-Secret`
-- **API Key**: `X-Metals-Api-Key`
-
-### Rate Limits
-- Application: 30 req/min/IP, 120 req/min global
-- Cloudflare Edge: 20 req/10s/IP/colo
-
-## Scriptable Widget
-
-The API is compatible with the Scriptable widget (see `frontend/` directory).
-
-### Widget Parameters
-- `today` - Current prices
-- `gold` - 24K gold history
-- `gold:22k` - 22K gold history
-- `silver` - Silver history
-- JSON: `{"mode":"gold","purity":"24k","days":4}`
-
-## Cloudflare Resources
-
-| Resource | Purpose |
-|----------|---------|
-| Tunnel | Secure origin connection |
-| DNS | Public hostname |
-| Access App | Authentication |
-| Service Token | Non-interactive auth |
-| Rate Limit | DDoS protection |
-
-## Project Structure
-
-```
-metalrates/
-├── backend/
-│   ├── main.py                 # FastAPI app
-│   ├── providers/              # Provider architecture
-│   │   ├── base.py            # Abstract base class
-│   │   ├── goodreturns.py     # Goodreturns implementation
-│   │   ├── manager.py         # Failover manager
-│   │   └── __init__.py
-│   ├── services/               # Shared services
-│   │   ├── cache.py           # File-based cache
-│   │   ├── validator.py       # Data validation
-│   │   ├── normalizer.py      # Unit normalization
-│   │   └── __init__.py
-│   ├── models/
-│   │   └── prices.py          # Data models
-│   ├── tests/
-│   │   └── test_providers.py  # Unit tests
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   ├── requirements.txt
-│   └── .dockerignore
-├── frontend/
-│   ├── Price history.js       # Scriptable widget (gitignored - contains personal domain)
-│   └── scriptable-config.js   # Widget config template (gitignored)
-├── docs/
-│   ├── README.md
-│   ├── INSTRUCTIONS.md
-│   ├── CLOUDFLARE_SETUP_GUIDE.md
-│   ├── CLOUDFLARE_DEBUG_GUIDE.md
-│   └── DEPLOYMENT_SUMMARY.md
-└── scripts/
-    ├── cloudflared-config.yml
-    └── tunnel-credentials.json (gitignored - contains secrets)
-```
-
-## Cloudflare Tunnel Connector Setup
-
-Run on your home server:
-
-```bash
-# 1. Install cloudflared
-# https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation
-
-# 2. Configure
-mkdir -p ~/.cloudflared
-cp tunnel-credentials.json ~/.cloudflared/<your-tunnel-id>.json
-cp cloudflared-config.yml ~/.cloudflared/config.yml
-
-# 3. Run
-cloudflared tunnel run <your-tunnel-name>
-
-# 4. Or as service (systemd)
-sudo cp cloudflared.service /etc/systemd/system/
-sudo systemctl enable --now cloudflared
-```
-
-## Testing
-
-```bash
-# Unit tests
-cd backend
-python -m pytest tests/ -v
-
-# Local API test
-curl -H "X-Metals-Api-Key: test-key" http://127.0.0.1:8765/api/metals | python3 -m json.tool
-
-# Health check
-curl http://127.0.0.1:8765/health
-
-# Provider status
-curl -H "X-Metals-Api-Key: test-key" http://127.0.0.1:8765/providers/status
-```
-
-## Security
-
-- Origin binds to `127.0.0.1:8765` only
-- No direct public access to origin
-- Cloudflare Access enforces service token auth
-- Rate limiting at edge and application
-- WAF blocks non-API paths
-- No credentials in logs, code, or images
-- Cache-Control: no-store on responses
-
-## Important Security Notes
-
-- **Never commit `.env`** - contains real credentials
-- **Never commit `scripts/tunnel-credentials.json`** - Cloudflare tunnel credentials
-- **Never commit `frontend/Price history.js`** - contains personal domain
-- Use `.env.example` as template
-- Rotate API keys if accidentally committed
-
-## License
-
-Personal use.
+Credentials belong in Keychain or ignored `.env` files. Historical credentials were
+rotated and repository history cleaned. Re-clone old checkouts rather than merging old history. Cached GitHub views or downloaded copies can retain revoked values.
+The ignored personal widget is never published. No redistribution license has been
+selected yet.
