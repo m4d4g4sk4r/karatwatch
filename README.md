@@ -28,7 +28,7 @@ curl http://127.0.0.1:8765/health
 
 The process listens on all interfaces inside Docker, while the host publishes
 only `127.0.0.1:8765`. Existing deployment resource names are retained for compatibility.
-The bind-mounted `backend/data/` directory must be writable by the container user
+The bind-mounted `data/` directory must be writable by the container user
 (`nobody`); provision its permissions before deployment if necessary.
 
 For Python development, create a virtual environment, install
@@ -121,7 +121,7 @@ validate Compose, and build/start the Docker image on every PR. CI does not depl
 ## Publication status
 
 Historical commits contained deployment credentials. Removing them from current
-files does not revoke them or erase history. Rotate exposed credentials before
-reusing the deployment; coordinate widget Keychain updates. Do not publish private
+files does not revoke them or erase history. The exposed Access secret and backend API key were rotated during remediation.
+Update widget Keychain values from your private local configuration. Do not publish private
 configuration. No open-source license has been selected yet; public visibility
 alone does not grant a redistribution license.

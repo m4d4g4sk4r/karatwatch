@@ -1,0 +1,13 @@
+title = "KaratWatch secret detection"
+[extend]
+useDefault = true
+
+[[rules]]
+id = "cloudflare-access-secret"
+description = "Cloudflare Access service secret"
+regex = '''cfast_[A-Za-z0-9_-]{20,}'''
+
+[[rules]]
+id = "legacy-placeholder-key"
+description = "Previously deployed weak API key"
+regex = '''test-api-key-[0-9]{5,}'''
