@@ -1,4 +1,4 @@
-# Precious Metals API - Agent Instructions
+# KaratWatch - Agent Instructions
 
 ## Project Overview
 A FastAPI-based backend service that fetches gold and silver prices for Ahmedabad, India from multiple providers, with caching, rate limiting, and failover. Includes a Scriptable iOS widget for displaying prices.
@@ -132,3 +132,6 @@ Widget parameter examples:
 - Health check: `GET /health`
 - Logs: `docker-compose logs -f metals-api`
 - Provider status: `GET /providers/status` (authenticated)
+
+## Public distribution and CI
+Publish `frontend/KaratWatch.js` with a placeholder hostname. Keep the personal widget ignored. See CONTRIBUTING.md for PR checks. Never deploy from CI or expose secrets to pull requests. Root README supersedes historical deployment notes.
